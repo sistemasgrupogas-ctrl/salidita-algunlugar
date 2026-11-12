@@ -55,7 +55,15 @@
         .btn-yes { background: #22c55e; color: white; }
         .btn-no { background: #ef4444; color: white; position: relative; }
         
-        .options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 20px; }
+        .options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 20px; }
+        .option-btn { min-height: 66px; overflow-wrap: anywhere; }
+        .option-btn:focus-visible, .btn:focus-visible { outline: 3px solid #f59e0b; outline-offset: 3px; }
+        .hint { color: #64748b; font-size: 14px; margin-top: -8px; }
+        @media (max-width: 380px) {
+            .screen { padding: 24px 16px; }
+            .options { grid-template-columns: 1fr; }
+            .btn { margin: 8px 4px; }
+        }
         .option-btn {
             padding: 16px;
             background: #f1f5f9;
@@ -101,7 +109,8 @@
         </div>
 
         <div class="screen" id="screenCine">
-            <h1>🎥 Elige la película</h1>
+            <h1 id="detailTitle">✨ Elige una opción</h1>
+            <p id="detailSubtitle">Hay muchas posibilidades...</p>
             <div class="options" id="movies"></div>
             <button class="btn btn-yes" onclick="backToPlaces()">← Volver</button>
         </div>
@@ -131,9 +140,118 @@
     <script>
         let selectedPlace = "";
         let selectedMovie = "";
+        let selectedDetail = "";
+        document.getElementById('dateInput').min = new Date().toISOString().split('T')[0];
 
-        const places = ["Cine 🎥", "Boliche 🎳", "Pizza 🍕", "Plaza 🌳", "Nada :(", "Carnita 🥩 ", "Café ☕", "Parque 🦋"];
-        const movies = ["Atrápelo Quien Pueda", "Ebenezer: Los Fantasmas De Navidad", "Yo Soy Rocky", "Godzilla Minus Zero", "La Venganza Del Charro Negro", "El Gato Con Sombrero"];
+        // Cada categoría tiene opciones adicionales para personalizar el plan.
+        const places = [
+            "🎥 Cine", "🎳 Boliche", "🍕 Pizza", "🌳 Plaza comercial",
+            "🥩 Carnita asada", "☕ Cafetería", "🦋 Parque", "🍔 Hamburguesas",
+            "🍣 Sushi", "🌮 Tacos", "🍗 Alitas", "🍝 Comida italiana",
+            "🍦 Heladería", "🍰 Postres", "🍜 Comida asiática", "🥞 Desayuno/brunch",
+            "🎤 Karaoke", "🎱 Billar", "🎮 Videojuegos", "🎳 Arcade",
+            "⛸️ Patinaje", "🧩 Escape room", "🎨 Museo o exposición",
+            "🏛️ Lugar histórico", "🧺 Picnic", "🌅 Ver el atardecer",
+            "🌌 Ver las estrellas", "🚶 Paseo nocturno", "🐾 Zoológico",
+            "🌿 Jardín botánico", "🎡 Feria o juegos", "🎭 Teatro",
+            "🎶 Concierto", "🏖️ Alberca", "🏕️ Aventura al aire libre",
+            "🏠 Plan en casa", "🚗 Salir a dar una vuelta", "🎁 Tú eliges por mí"
+        ];
+
+        const detailOptions = {
+            "🎥 Cine": [
+                "🍿 Acción y aventura", "😂 Comedia", "❤️ Romance",
+                "👻 Terror", "🚀 Ciencia ficción", "🧙 Fantasía",
+                "🕵️ Misterio", "🎭 Drama", "🐉 Animación",
+                "🎬 La película que tú elijas", "🎟️ Doble función"
+            ],
+            "🎳 Boliche": ["🎳 Una partida tranquila", "🏆 Competencia: quien pierda invita",
+                "🎯 Varias rondas", "🥤 Boliche + bebidas", "💘 Equipos contra equipos"],
+            "🍕 Pizza": ["🍕 Pizza clásica", "🧀 Extra queso", "🍍 Hawaiana",
+                "🍄 Vegetariana", "🌶️ Algo picante", "🍕 Mitad y mitad"],
+            "🌳 Plaza comercial": ["🛍️ Ir de compras", "🍦 Comprar un helado",
+                "🎮 Juegos y maquinitas", "🍿 Cine en la plaza", "🍽️ Comer algo",
+                "🚶 Recorrerla sin rumbo"],
+            "🥩 Carnita asada": ["🥩 Una buena parrillada", "🌮 Tacos de carne",
+                "🔥 Algo bien preparado", "🍽️ Restaurante", "🏡 Plan más casero"],
+            "☕ Cafetería": ["☕ Café y conversación", "🧋 Bebidas frías",
+                "🍰 Café y postre", "📚 Una cafetería tranquila", "🌙 Café por la noche"],
+            "🦋 Parque": ["🧺 Picnic", "🚶 Caminar juntos", "🦆 Dar de comer a los patos",
+                "📸 Tomar fotografías", "🌳 Buscar un lugar tranquilo"],
+            "🍔 Hamburguesas": ["🍔 Hamburguesa clásica", "🧀 Doble queso",
+                "🥓 Con tocino", "🍟 Hamburguesa + papas", "🌱 Opción vegetariana"],
+            "🍣 Sushi": ["🍣 Rollos clásicos", "🔥 Rollos empanizados",
+                "🥢 Combo para compartir", "🍱 Un menú variado", "🍤 Sushi + entradas"],
+            "🌮 Tacos": ["🌮 Tacos al pastor", "🥩 Tacos de bistec",
+                "🌯 Tacos de harina", "🌶️ Probar una taquería nueva", "🌮 Ruta de tacos"],
+            "🍗 Alitas": ["🍯 BBQ", "🌶️ Extra picantes", "🍋 Limón y pimienta",
+                "🧄 Ajo parmesano", "🍗 Alitas + boneless"],
+            "🍝 Comida italiana": ["🍝 Pasta", "🍕 Pizza italiana",
+                "🥖 Lasagna", "🍞 Pan de ajo", "🍽️ Cena italiana completa"],
+            "🍦 Heladería": ["🍦 Cono", "🥤 Malteada", "🍨 Banana split",
+                "🍧 Nieves", "🍫 Algo con chocolate"],
+            "🍰 Postres": ["🍰 Pastel", "🧇 Waffles", "🥞 Crepas",
+                "🍩 Donas", "🍪 Galletas", "🍫 Chocolate"],
+            "🍜 Comida asiática": ["🍜 Ramen", "🥟 Dumplings", "🍚 Arroz especial",
+                "🍱 Comida japonesa", "🥢 Probar algo nuevo"],
+            "🥞 Desayuno/brunch": ["🥞 Hot cakes", "🧇 Waffles",
+                "🥐 Pan dulce y café", "🍳 Desayuno completo", "🍓 Fruta y algo ligero"],
+            "🎤 Karaoke": ["🎤 Canciones románticas", "🎶 Nuestros duetos",
+                "😂 Canciones para reír", "🏆 Competencia de canto"],
+            "🎱 Billar": ["🎱 Una partida", "🏆 El perdedor invita",
+                "🎯 Torneo al mejor de tres", "🥤 Billar y bebidas"],
+            "🎮 Videojuegos": ["🎮 Jugar en equipo", "🥊 Juegos de pelea",
+                "🏎️ Carreras", "😂 Juegos para reír", "🏆 Competencia"],
+            "🎳 Arcade": ["🕹️ Máquinas clásicas", "🏀 Juegos de habilidad",
+                "🎯 Ganar premios", "🏆 Competencia de puntos"],
+            "⛸️ Patinaje": ["⛸️ Patinar un rato", "😂 Aprender juntos",
+                "💘 Tomarnos de la mano", "🥤 Patinar y después comer"],
+            "🧩 Escape room": ["🕵️ Misterio", "👻 Terror",
+                "🔐 Aventura", "🧠 Rompecabezas", "🤝 Resolverlo en equipo"],
+            "🎨 Museo o exposición": ["🎨 Arte moderno", "🖼️ Pintura",
+                "📸 Exposición interactiva", "🏛️ Historia", "✨ La exposición que esté disponible"],
+            "🏛️ Lugar histórico": ["🏛️ Recorrido histórico", "📸 Tomar fotos",
+                "🚶 Caminar y conocer", "☕ Terminar con un café"],
+            "🧺 Picnic": ["🍓 Picnic con fruta", "🥪 Sándwiches y bebidas",
+                "🍫 Algo dulce", "🌅 Picnic al atardecer", "🧺 Tú preparas la sorpresa"],
+            "🌅 Ver el atardecer": ["🌅 Un lugar con buena vista", "📸 Fotos juntos",
+                "🎶 Música tranquila", "🧃 Llevar algo para tomar"],
+            "🌌 Ver las estrellas": ["🌌 Buscar un lugar tranquilo", "🧺 Llevar una manta",
+                "✨ Identificar constelaciones", "🎶 Música y conversación"],
+            "🚶 Paseo nocturno": ["🌃 Caminar por un lugar bonito", "🍦 Comprar algo",
+                "🎶 Paseo con música", "📸 Fotos nocturnas"],
+            "🐾 Zoológico": ["🦁 Ver animales", "🦋 Mariposario", "📸 Tomar fotografías",
+                "🚶 Recorrer todo con calma"],
+            "🌿 Jardín botánico": ["🌺 Recorrer los jardines", "📸 Fotografías",
+                "🌳 Buscar el rincón más bonito", "🧺 Paseo y picnic"],
+            "🎡 Feria o juegos": ["🎡 Juegos mecánicos", "🎯 Juegos de destreza",
+                "🍭 Antojitos", "🎁 Intentar ganar un premio"],
+            "🎭 Teatro": ["😂 Comedia", "🎭 Obra dramática", "🎶 Musical",
+                "🎟️ La función que más te guste"],
+            "🎶 Concierto": ["🎸 Rock", "🎤 Pop", "🎶 Música romántica",
+                "🎧 Música en vivo", "✨ El artista que tú elijas"],
+            "🏖️ Alberca": ["🏊 Nadar", "☀️ Pasar la tarde", "🥤 Bebidas y descanso",
+                "🎶 Música y alberca"],
+            "🏕️ Aventura al aire libre": ["🥾 Senderismo", "🚴 Paseo en bicicleta",
+                "🌄 Explorar un lugar nuevo", "📸 Aventura y fotografías"],
+            "🏠 Plan en casa": ["🍿 Película y snacks", "🍕 Pedir comida",
+                "🎮 Videojuegos", "🍳 Cocinar juntos", "🎲 Juegos de mesa",
+                "🎶 Música y plática"],
+            "🚗 Salir a dar una vuelta": ["🌃 Manejar sin prisa", "🌅 Ver el atardecer",
+                "☕ Buscar un café", "🎶 Música y carretera"],
+            "🎁 Tú eliges por mí": ["🎁 Sorpréndeme", "❤️ Algo romántico",
+                "😂 Algo divertido", "✨ Algo que nunca hayamos hecho"]
+        };
+
+        const movies = [
+            "Atrápelo quien pueda", "Ebenezer: Los fantasmas de Navidad",
+            "Yo soy Rocky", "Godzilla Minus Zero", "La venganza del Charro Negro",
+            "El gato con sombrero", "Una película de acción", "Una comedia romántica",
+            "Una película de terror", "Una de ciencia ficción", "Una de suspenso",
+            "Una película animada", "Una película de superhéroes",
+            "Una película clásica", "La que esté de estreno",
+            "La que tú quieras ❤️", "Elegirla juntos en el cine"
+        ];
 
         // ===DATOS
         emailjs.init("TKf1yj0BW9Cz7EXTI");
@@ -170,25 +288,31 @@
 
         function selectPlace(place) {
             selectedPlace = place;
-            if (place.includes("Cine")) {
-                document.getElementById('screen2').classList.remove('active');
-                document.getElementById('screenCine').classList.add('active');
-                loadMovies();
-            } else {
-                document.getElementById('screen2').classList.remove('active');
-                document.getElementById('screen3').classList.add('active');
-            }
+            selectedMovie = "";
+            selectedDetail = "";
+            const options = place.includes("🎥") ? movies : (detailOptions[place] || ["✨ Elegir juntos"]);
+            const title = document.getElementById('detailTitle');
+            title.textContent = place.includes("🎥") ? "🎥 Elige la película" : "✨ Personaliza el plan";
+            document.getElementById('detailSubtitle').textContent =
+                place.includes("🎥") ? "También puedes elegir el género o decidirlo juntos." : "¿Qué te gustaría hacer?";
+            document.getElementById('screen2').classList.remove('active');
+            document.getElementById('screenCine').classList.add('active');
+            loadMovies(options);
         }
 
-        function loadMovies() {
+        function loadMovies(options = movies) {
             const moviesDiv = document.getElementById('movies');
             moviesDiv.innerHTML = '';
-            movies.forEach(movie => {
+            options.forEach(option => {
                 const btn = document.createElement('button');
                 btn.className = 'option-btn';
-                btn.textContent = movie;
+                btn.textContent = option;
                 btn.onclick = () => {
-                    selectedMovie = movie;
+                    if (selectedPlace.includes("🎥")) {
+                        selectedMovie = option;
+                    } else {
+                        selectedDetail = option;
+                    }
                     document.getElementById('screenCine').classList.remove('active');
                     document.getElementById('screen3').classList.add('active');
                 };
@@ -214,6 +338,7 @@
 
             let lugar = selectedPlace;
             if (selectedMovie) lugar += ` - ${selectedMovie}`;
+            if (selectedDetail) lugar += ` - ${selectedDetail}`;
 
             const mensajeHTML = `
                 ¡Cita Confirmada! ❤️<br><br>
@@ -234,6 +359,7 @@
             emailjs.send(SERVICE_ID, TEMPLATE_ID, {
                 lugar: lugar,
                 pelicula: selectedMovie || "No aplica",
+                detalle: selectedDetail || "No aplica",
                 fecha: new Date(date).toLocaleDateString('es-ES'),
                 hora: time
             });
